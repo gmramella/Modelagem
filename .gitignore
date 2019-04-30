@@ -21,7 +21,6 @@
 x64/
 x86/
 bld/
-[Bb]in/
 [Oo]bj/
 [Ll]og/
 
@@ -332,3 +331,5 @@ ASALocalRun/
 
 # Local History for Visual Studio
 .localhistory/
+
+!
