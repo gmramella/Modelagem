@@ -37,20 +37,19 @@ std::vector<Transition*> PetriNet::getTransitions() {
 	return transitions;
 }
 
-void PetriNet::runCycle(std::vector<Movement> playersMovements, std::vector<Player> players) {
+void PetriNet::runCycle(Movements movements, std::vector<Player> players, std::vector<Npc> npcs) {
 	std::vector<Transition*> transitionsEnabled;
 	std::vector<PetriToken*> copies;
 
+	std::vector<Movement> playersMovements = movements.playersMovements;
+
 	for (unsigned int i = 0; i < playersPlacesPtr.size(); i++) {
 		if (playersMovements[i].hDir != 0 || playersMovements[i].vDir != 0) {
-			Pos pos = playersPlacesPtr[i]->getPos();
-			int index = width * pos.y + pos.x;
-			std::cout << "(" << pos.x << ", " << pos.y << ")" << std::endl;
-			std::cout << "(" << playersMovements[i].hDir << ", " << playersMovements[i].vDir << ")" << std::endl;
 			double p2 = pow(2, (playersMovements[i].hDir + 2));
 			double p3 = pow(3, (playersMovements[i].vDir + 2));
 			int j = godelToIndex((int)(p2 * p3));
-			Transition* tIn = playersInTransitionsPtr[8 * index + j];
+			std::cout << "godel " << j << std::endl;
+			Transition* tIn = playersInTransitionsPtr[8 * i + j];
 			tIn->setIsEnabled(true);
 			transitionsEnabled.push_back(tIn);
 			if (transitionEnableCallback != nullptr) this->transitionEnableCallback(tIn);
@@ -69,7 +68,7 @@ void PetriNet::runCycle(std::vector<Movement> playersMovements, std::vector<Play
 				}
 			}
 			
-			Transition* tOut = playersOutTransitionsPtr[8 * index + j];
+			Transition* tOut = playersOutTransitionsPtr[8 * i + j];
 			std::vector<Connection*> outputConnections = tOut->getOutputConnections();
 			for (std::vector<Connection*>::iterator connection = outputConnections.begin(); connection != outputConnections.end(); connection++) {
 				unsigned int weight = (*connection)->getWeight();
@@ -84,6 +83,10 @@ void PetriNet::runCycle(std::vector<Movement> playersMovements, std::vector<Play
 			}
 		}
 	}
+
+	for (unsigned int i = 0; i < npcsPlacesPtr.size(); i++) {
+		Pos pos = npcsPlacesPtr[i]->getPos();
+	}
 	
 	for (unsigned int i = 0; i < transitionsEnabled.size(); i++) {
 		Transition* t = transitionsEnabled[i];
@@ -91,31 +94,28 @@ void PetriNet::runCycle(std::vector<Movement> playersMovements, std::vector<Play
 		t->setIsEnabled(false);
 	}
 	
-	for (unsigned int i = 0; i < playersPlacesPtr.size(); i++) {
-		if (playersMovements[i].hDir != 0 && playersMovements[i].vDir != 0) {
-			//tirar place
-			//tirar transitions
-			//colocar place
-			//colocar transitions
-
-			playersPlacesPtr.clear();
-			playersInTransitionsPtr.clear();
-			playersOutTransitionsPtr.clear();
-			flagsInTransitionsPtr.clear();
-			flagsOutTransitionsPtr.clear();
-			npcsInTransitionsPtr.clear();
-			npcsOutTransitionsPtr.clear();
-
-			for (unsigned int i = 0; i < players.size(); i++) {
-				unsigned int x = players[i].getX();
-				unsigned int y = players[i].getY();
-				unsigned int index = width * y + x;
-				std::cout << x << ", " << y << std::endl;
+	/*for (unsigned int i = 0; i < players.size(); i++) {
+		if (playersMovements[i].hDir != 0 || playersMovements[i].vDir != 0) {
+			playersPlacesPtr.erase(playersPlacesPtr.begin() + i);
+			for (unsigned int j = 0; j < 8; j++) {
+				unsigned int index = 8 * i + j;
 				std::cout << index << std::endl;
-				playersPlacesPtr.push_back(places2.at(index));
+				playersInTransitionsPtr.erase(playersInTransitionsPtr.begin() + index);
+				playersOutTransitionsPtr.erase(playersOutTransitionsPtr.begin() + index);
+			}
+
+			unsigned int x = players[i].getX();
+			unsigned int y = players[i].getY();
+			unsigned int index = width * y + x;
+			std::cout << x << ", " << y << std::endl;
+			std::cout << index << std::endl;
+			playersPlacesPtr.insert(playersPlacesPtr.begin() + i, places2.at(index));
+			for (unsigned int j = 0; j < 8; j++) {
+				playersInTransitionsPtr.insert(playersInTransitionsPtr.begin() + 8 * i + j, transitions2.at(8 * index + j));
+				playersOutTransitionsPtr.insert(playersOutTransitionsPtr.begin() + 8 * i + j, transitions2.at(8 * index + j));
 			}
 		}
-	}
+	}*/
 }
 
 void PetriNet::showStatus() {
@@ -189,8 +189,13 @@ std::vector<Connection*> PetriNet::getPlaceConnections(Place place)
 	return out;
 }
 
-void PetriNet::generate(GridGenerator grid, unsigned int width, unsigned int height)
+void PetriNet::generate(GridGenerator grid, unsigned int width, unsigned int height, void(*tepc)(PetriToken, Place), void(*tlpc)(PetriToken, Place), void(*tec)(Transition), void(*tfc)(Transition))
 {
+	setTokenEnteringPlaceCallback(tepc);
+	setTokenLeavingPlaceCallback(tlpc);
+	setTransitionEnableCallback(tec);
+	setTransitionFireCallback(tfc);
+
 	std::vector<Player> players = grid.getPlayers();
 	std::vector<Flag> flags = grid.getFlags();
 	std::vector<Npc> npcs = grid.getNpcs();
@@ -199,8 +204,8 @@ void PetriNet::generate(GridGenerator grid, unsigned int width, unsigned int hei
 	unsigned int transitionIdCounter = 0;
 	unsigned int connectionIdCounter = 0;
 
-	for (unsigned int i = 0; i < width; i++) {
-		for (unsigned int j = 0; j < height; j++) {
+	for (unsigned int j = 0; j < height; j++) {
+		for (unsigned int i = 0; i < width; i++) {
 			places2.push_back(new Place(width * j + i, Pos(i, j), false));
 		}
 	}
@@ -221,6 +226,9 @@ void PetriNet::generate(GridGenerator grid, unsigned int width, unsigned int hei
 		unsigned int index = width * y + x;
 		places2.at(index)->addToken(new PetriToken(petriTokenIdCounter++));
 		flagsPlacesPtr.push_back(places2.at(index));
+		std::cout << index << std::endl;
+		std::cout << "(" << flags[i].getX() << ", " << flags[i].getY() << ")" << std::endl;
+		std::cout << "(" << flagsPlacesPtr[i]->getPos().x << ", " << flagsPlacesPtr[i]->getPos().y << ")" << std::endl;
 	}
 	for (unsigned int i = 0; i < npcs.size(); i++) {
 		unsigned int x = npcs[i].getX();
@@ -228,10 +236,13 @@ void PetriNet::generate(GridGenerator grid, unsigned int width, unsigned int hei
 		unsigned int index = width * y + x;
 		places2.at(index)->addToken(new PetriToken(petriTokenIdCounter++));
 		npcsPlacesPtr.push_back(places2.at(index));
+		std::cout << index << std::endl;
+		std::cout << "(" << npcs[i].getX() << ", " << npcs[i].getY() << ")" << std::endl;
+		std::cout << "(" << npcsPlacesPtr[i]->getPos().x << ", " << npcsPlacesPtr[i]->getPos().y << ")" << std::endl;
 	}
 
-	for (unsigned int i = 0; i < width; i++) {
-		for (unsigned int j = 0; j < height; j++) {
+	for (unsigned int j = 0; j < height; j++) {
+		for (unsigned int i = 0; i < width; i++) {
 			Transition* tWest = new Transition(transitionIdCounter++, false, false);
 			Transition* tEast = new Transition(transitionIdCounter++, false, false);
 			Transition* tNorth = new Transition(transitionIdCounter++, false, false);
@@ -329,4 +340,37 @@ void PetriNet::generate(GridGenerator grid, unsigned int width, unsigned int hei
 			npcsOutTransitionsPtr.push_back(transitions2.at(8 * index + j));
 		}
 	}
+
+	/*std::cout << "playersPlacesPtr " << playersPlacesPtr.size() << std::endl;
+	std::cout << "flagsPlacesPtr " << flagsPlacesPtr.size() << std::endl;
+	std::cout << "npcsPlacesPtr " << npcsPlacesPtr.size() << std::endl;
+	std::cout << "playersInTransitionsPtr " << playersInTransitionsPtr.size() << std::endl;
+	std::cout << "playersOutTransitionsPtr " << playersOutTransitionsPtr.size() << std::endl;
+	std::cout << "flagsInTransitionsPtr " << flagsInTransitionsPtr.size() << std::endl;
+	std::cout << "flagsOutTransitionsPtr " << flagsOutTransitionsPtr.size() << std::endl;
+	std::cout << "npcsInTransitionsPtr " << npcsInTransitionsPtr.size() << std::endl;
+	std::cout << "npcsOutTransitionsPtr " << npcsOutTransitionsPtr.size() << std::endl;*/
+}
+
+void PetriNet::destroy()
+{
+	setTokenEnteringPlaceCallback(nullptr);
+	setTokenLeavingPlaceCallback(nullptr);
+	setTransitionEnableCallback(nullptr);
+	setTransitionFireCallback(nullptr);
+	
+	playersPlacesPtr.clear();
+	flagsPlacesPtr.clear();
+	npcsPlacesPtr.clear();
+	playersInTransitionsPtr.clear();
+	playersOutTransitionsPtr.clear();
+	flagsInTransitionsPtr.clear();
+	flagsOutTransitionsPtr.clear();
+	npcsInTransitionsPtr.clear();
+	npcsOutTransitionsPtr.clear();
+
+	places2.clear();
+	transitions2.clear();
+	places.clear();
+	transitions.clear();
 }

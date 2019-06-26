@@ -1,7 +1,8 @@
+#pragma once
 #include <iostream>
 #include <climits>
 #include <vector>
-#pragma once
+#include "GridGenerator.h"
 
 class Edge
 {
@@ -9,9 +10,20 @@ public:
 	Edge(unsigned int targetNodeId, unsigned int weight);
 	unsigned int getTargetNodeId();
 	unsigned int getWeight();
+	Edge* next = nullptr;
 private:
 	unsigned int targetNodeId;
 	unsigned int weight;
+};
+
+class EdgeList
+{
+public:
+	Edge* head = nullptr;
+	void addEdge(Edge e);
+	unsigned int size();
+private:
+	unsigned int length = 0;
 };
 
 class Node
@@ -20,27 +32,33 @@ public:
 	Node();
 	Node(unsigned int id);
 	unsigned int getId();
-	std::vector<Edge> getEdges();
+	void setId(unsigned int id);
+	EdgeList getEdges();
 	void addNeighbor(unsigned int neighborId, unsigned int weight);
 	void operator=(Node& other);
 private:
 	unsigned int id;
-	std::vector<Edge> edges;
+	EdgeList edges;
 };
 
 class Graph
 {
 public:
+	Graph(unsigned int width, unsigned int height);
+	~Graph();
+	unsigned int size();
 	void addNode(unsigned int id);
 	void addEdge(unsigned int sId, unsigned int tId, unsigned int weight);
-	std::vector<Node> getNodes();
-	Node* getNodeById(unsigned int id);
-	unsigned int getNodePosById(unsigned int id);
-	bool nodeIdInGraph(unsigned int id);
+	Node** getNodes();
+	Node getNodeById(unsigned int id);
+	Pos2 getNodePosById(unsigned int id);
+	bool nodeInGraph(unsigned int id);
 	void print();
 	std::vector<unsigned int> dijkstra(unsigned int sId, unsigned int tId);
 private:
-	std::vector<Node> nodes;
+	Node** nodes;
+	unsigned int width;
+	unsigned int height;
 };
 
 class HeapNode
@@ -66,6 +84,7 @@ private:
 class HeapNodeMin
 {
 public:
+	HeapNodeMin(HeapNode* heapNode, unsigned int pos);
 	HeapNode* getHeapNode();
 	void setHeapNode(HeapNode* heapNode);
 	unsigned int getPos();
@@ -80,7 +99,7 @@ class Heap
 public:
 	std::vector<HeapNode> getHeapNodes();
 	void addHeapNode(HeapNode hn);
-	void setCostAtPos(unsigned int pos, unsigned int cost);
+	void setCost(unsigned int pos, unsigned int cost);
 	void setPredAtPos(unsigned int pos, unsigned int pred);
 	bool isEmpty();
 	HeapNodeMin* min();

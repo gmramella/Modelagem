@@ -104,6 +104,7 @@
     <ClCompile Include="Graph.cpp" />
     <ClCompile Include="GridGenerator.cpp" />
     <ClCompile Include="Jogo.cpp" />
+    <ClCompile Include="Randomizer.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Npc.cpp" />
     <ClCompile Include="PetriNet.cpp" />
@@ -125,6 +126,7 @@
     <ClInclude Include="PetriToken.h" />
     <ClInclude Include="Place.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="Randomizer.h" />
     <ClInclude Include="TerrainGenerator.h" />
     <ClInclude Include="Transition.h" />
     <ClInclude Include="Utils.h" />

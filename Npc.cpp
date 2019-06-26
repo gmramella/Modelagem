@@ -38,3 +38,38 @@ unsigned int Npc::getY()
 {
 	return y;
 }
+
+void Npc::hMove(unsigned int hDir)
+{
+	x += hDir;
+}
+
+void Npc::vMove(unsigned int vDir)
+{
+	y += vDir;
+}
+
+bool Npc::getCanMove()
+{
+	return canMove;
+}
+
+void Npc::setCanMove(bool canMove)
+{
+	this->canMove = canMove;
+}
+
+void Npc::decMoveCounter()
+{
+	moveCounter--;
+}
+
+unsigned int Npc::getMoveCounter()
+{
+	return moveCounter;
+}
+
+void Npc::setMoveCounter(unsigned int moveCounter)
+{
+	this->moveCounter = moveCounter;
+}

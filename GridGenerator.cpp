@@ -1,6 +1,6 @@
 #include "GridGenerator.h"
 
-void GridGenerator::generate(bool ** terrain, unsigned int width, unsigned int height)
+void GridGenerator::generate(bool** terrain, unsigned int width, unsigned int height)
 {
 	this->width = width;
 	this->height = height;
@@ -18,8 +18,35 @@ void GridGenerator::generate(bool ** terrain, unsigned int width, unsigned int h
 			grid[i][j].type = (terrain[i][j] == 0) ? tEmpty : tWall;
 			grid[i][j].x = spriteWidth * i + spriteWidth / 2;
 			grid[i][j].y = spriteHeight * j + spriteHeight / 2;
+			if (grid[i][j].type == tEmpty) {
+				grid[i][j].dijkstraWeight = 1 + rand() % 9;
+			}
+			else if (grid[i][j].type == tPlayer) {
+				grid[i][j].dijkstraWeight = 1;
+			}
+			else if (grid[i][j].type == tNpc) {
+				grid[i][j].dijkstraWeight = INT_MAX;
+			}
+			else if (grid[i][j].type == tFlag) {
+				grid[i][j].dijkstraWeight = 1;
+			}
+			else {
+				grid[i][j].dijkstraWeight = INT_MAX;
+			}
 		}
 	}
+}
+
+void GridGenerator::destroy(unsigned int width, unsigned int height)
+{
+	for (unsigned int i = 0; i < width; i++)
+		delete[] grid[i];
+	delete[] grid;
+
+	quadrants.clear();
+	players.clear();
+	npcs.clear();
+	flags.clear();
 }
 
 unsigned int GridGenerator::addPlayers(unsigned int nPlayers)
@@ -309,6 +336,34 @@ void GridGenerator::evaporate()
 	}
 }
 
+bool GridGenerator::sink(bool sinking, Movement dir)
+{
+	if (!sinking) {
+		if (sinkHole) delete sinkHole;
+		sinkHole = new Pos2(dir.hDir, dir.vDir);
+		lastPos = *sinkHole;
+	}
+	else {
+		lastPos += Pos2(dir.hDir, dir.vDir);
+	}
+	if ((0 <= lastPos.x && lastPos.x < width && 0 <= lastPos.y && lastPos.y < height) && (grid[lastPos.x][lastPos.y].type == tEmpty || grid[lastPos.x][lastPos.y].type == tWall)) {
+		grid[lastPos.x][lastPos.y].type = tFlooded;
+		grid[lastPos.x][lastPos.y].sprite.setSpriteSheet("flooded");
+		return true;
+	}
+	else {
+		lastPos -= Pos2(dir.hDir, dir.vDir);
+		return false;
+	}
+}
+
+void GridGenerator::drawPath(std::vector<Pos2> pathPos)
+{
+	for (std::vector<Pos2>::iterator it = pathPos.begin()+1; it != pathPos.end()-1; it++) {
+		grid[it->x][it->y].type = tPath;
+	}
+}
+
 void GridGenerator::setSpritesheets()
 {
 	for (unsigned int i = 0; i < width; i++)
@@ -318,7 +373,7 @@ void GridGenerator::setSpritesheets()
 			switch (grid[i][j].type)
 			{
 			case tEmpty:
-				grid[i][j].sprite.setSpriteSheet("empty");
+				grid[i][j].sprite.setSpriteSheet("empty" + (weightsVisible ? to_string(grid[i][j].dijkstraWeight) : ""));
 				break;
 			case tWall:
 				grid[i][j].sprite.setSpriteSheet("wall");
@@ -335,14 +390,116 @@ void GridGenerator::setSpritesheets()
 			case tFlooded:
 				grid[i][j].sprite.setSpriteSheet("flooded");
 				break;
+			case tPath:
+				grid[i][j].sprite.setSpriteSheet("path");
+				break;
 			}
 		}
 	}
 }
 
-std::vector<Movement> GridGenerator::update()
+Movements GridGenerator::update()
 {
-	std::vector<Movement> output;
+	Movements output;
+
+	bool alive = true;
+	for (std::vector<Npc>::iterator n = npcs.begin(); n != npcs.end(); n++) {
+		if (n->getCanMove()) {
+			Pos2 nPos(n->getX(), n->getY());
+			unsigned int minDist = UINT_MAX;
+			unsigned int x = 1;
+			unsigned int y = 1;
+			for (std::vector<Player>::iterator p = players.begin(); p != players.end(); p++) {
+				Pos2 pPos(p->getX(), p->getY());
+				unsigned int dists[3][3];
+				for (int i = 0; i < 3; i++) {
+					for (int j = 0; j < 3; j++) {
+						if ((nPos.x == 0 && i == 0) || (nPos.x == width - 1 && i == 2) || (nPos.y == 0 && j == 0) || (nPos.y == height - 1 && j == 2)) dists[i][j] = UINT_MAX;
+						else dists[i][j] = manhattanDistance(nPos.x + (i - 1), nPos.y + (j - 1), pPos.x, pPos.y);
+					}
+				}
+				unsigned int min = UINT_MAX;
+				unsigned int minX = 1;
+				unsigned int minY = 1;
+				for (int i = 0; i < 3; i++) {
+					for (int j = 0; j < 3; j++) {
+						if (min > dists[i][j]) {
+							min = dists[i][j];
+							minX = i;
+							minY = j;
+						}
+					}
+				}
+				if (minDist > min) {
+					minDist = min;
+					x = minX;
+					y = minY;
+				}
+			}
+
+			int hDir = 0;
+			int vDir = 0;
+
+			if (y == 2)
+			{
+				vDir += 1;
+			}
+			if (x == 0)
+			{
+				hDir -= 1;
+			}
+			if (x == 2)
+			{
+				hDir += 1;
+			}
+			if (y == 0)
+			{
+				vDir -= 1;
+			}
+
+			if (grid[n->getX() + hDir][n->getY() + vDir].type == tEmpty || grid[n->getX() + hDir][n->getY() + vDir].type == tPath)
+			{
+				grid[n->getX()][n->getY()].type = tEmpty;
+				unsigned int weight = grid[n->getX()][n->getY()].dijkstraWeight;
+				grid[n->getX()][n->getY()].sprite.setSpriteSheet("empty" + (weightsVisible ? to_string(weight) : ""));
+				n->hMove(hDir);
+				n->vMove(vDir);
+				grid[n->getX()][n->getY()].type = tNpc;
+				grid[n->getX()][n->getY()].sprite.setSpriteSheet("npc");
+				output.npcsMovements.push_back(Movement(hDir, vDir));
+			}
+			else if (grid[n->getX() + hDir][n->getY() + vDir].type == tPlayer)
+			{
+				grid[n->getX()][n->getY()].type = tEmpty;
+				unsigned int weight = grid[n->getX()][n->getY()].dijkstraWeight;
+				grid[n->getX()][n->getY()].sprite.setSpriteSheet("empty" + (weightsVisible ? to_string(weight) : ""));
+				n->hMove(hDir);
+				n->vMove(vDir);
+				grid[n->getX()][n->getY()].type = tNpc;
+				grid[n->getX()][n->getY()].sprite.setSpriteSheet("npc");
+				output.npcsMovements.push_back(Movement(hDir, vDir));
+				alive = false;
+			}
+			else
+			{
+				output.npcsMovements.push_back(Movement(0, 0));
+			}
+
+			double dist = sqrt((hDir * hDir) + (vDir * vDir));
+			if (dist == 0) dist = 1;
+			n->setMoveCounter((int)floor(gTempo.getLimiteFPS() * dist / 10));
+			n->setCanMove(false);
+		}
+		else {
+			n->decMoveCounter();
+			if (n->getMoveCounter() == 0)
+			{
+				n->setCanMove(true);
+			}
+			output.playersMovements.push_back(Movement(0, 0));
+		}
+	}
+	output.allAlive = alive;
 
 	for (size_t i = 0; i < players.size(); i++)
 	{
@@ -368,25 +525,27 @@ std::vector<Movement> GridGenerator::update()
 				vDir -= 1;
 			}
 
-			if (grid[players[i].getX() + hDir][players[i].getY() + vDir].type == tEmpty)
+			if (grid[players[i].getX() + hDir][players[i].getY() + vDir].type == tEmpty || grid[players[i].getX() + hDir][players[i].getY() + vDir].type == tPath)
 			{
 				grid[players[i].getX()][players[i].getY()].type = tEmpty;
-				grid[players[i].getX()][players[i].getY()].sprite.setSpriteSheet("empty");
+				unsigned int weight = grid[players[i].getX()][players[i].getY()].dijkstraWeight;
+				grid[players[i].getX()][players[i].getY()].sprite.setSpriteSheet("empty" + (weightsVisible ? to_string(weight) : ""));
 				players[i].hMove(hDir);
 				players[i].vMove(vDir);
 				grid[players[i].getX()][players[i].getY()].type = tPlayer;
 				grid[players[i].getX()][players[i].getY()].sprite.setSpriteSheet("player");
-				output.push_back(Movement(hDir, vDir));
+				output.playersMovements.push_back(Movement(hDir, vDir));
 			}
 			else if (grid[players[i].getX() + hDir][players[i].getY() + vDir].type == tFlag)
 			{
 				grid[players[i].getX()][players[i].getY()].type = tEmpty;
-				grid[players[i].getX()][players[i].getY()].sprite.setSpriteSheet("empty");
+				unsigned int weight = grid[players[i].getX()][players[i].getY()].dijkstraWeight;
+				grid[players[i].getX()][players[i].getY()].sprite.setSpriteSheet("empty" + (weightsVisible ? to_string(weight) : ""));
 				players[i].hMove(hDir);
 				players[i].vMove(vDir);
 				grid[players[i].getX()][players[i].getY()].type = tPlayer;
 				grid[players[i].getX()][players[i].getY()].sprite.setSpriteSheet("player");
-				output.push_back(Movement(hDir, vDir));
+				output.playersMovements.push_back(Movement(hDir, vDir));
 				
 				for (std::vector<Flag>::iterator flag = flags.begin(); flag != flags.end(); flag++) {
 					if (flag->getX() == players[i].getX() && flag->getY() == players[i].getY())
@@ -398,7 +557,7 @@ std::vector<Movement> GridGenerator::update()
 			}
 			else
 			{
-				output.push_back(Movement(0, 0));
+				output.playersMovements.push_back(Movement(0, 0));
 			}
 
 			double dist = sqrt((hDir * hDir) + (vDir * vDir));
@@ -413,7 +572,7 @@ std::vector<Movement> GridGenerator::update()
 			{
 				players[i].setCanMove(true);
 			}
-			output.push_back(Movement(0, 0));
+			output.playersMovements.push_back(Movement(0, 0));
 		}
 	}
 
@@ -452,10 +611,15 @@ std::vector<Flag> GridGenerator::getFlags()
 	return flags;
 }
 
+void GridGenerator::toggleWeightsVisible()
+{
+	weightsVisible = !weightsVisible;
+}
+
 unsigned int GridGenerator::manhattanDistance(unsigned int x1, unsigned int y1, unsigned int x2, unsigned int y2)
 {
-	unsigned int x = (x1 > x2) ? x1 : x2;
-	unsigned int y = (y1 > y2) ? y1 : y2;
+	unsigned int x = (x1 > x2) ? x1 - x2 : x2 - x1;
+	unsigned int y = (y1 > y2) ? y1 - y2 : y2 - y1;
 	return x + y;
 }
 

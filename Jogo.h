@@ -8,6 +8,9 @@
 #include "Connection.h"
 #include "PetriNet.h"
 #include "Graph.h"
+#include <thread>
+#include <chrono>
+#include "Randomizer.h"
 #include <Windows.h>
 
 #ifdef _WIN32
@@ -62,6 +65,7 @@ public:
 	void inicializar();
 	void finalizar();
 	void executar();
+	void avancar();
 
 	Graph gridToGraph(GridGenerator gg);
 	PetriNet gridToPetriNet(GridGenerator grid);
@@ -69,5 +73,12 @@ private:
 	GridGenerator grid;
 	unsigned int width = 100;
 	unsigned int height = 75;
-	PetriNet pn;
+	PetriNet pn = PetriNet(width, height, false);
+	void loadSpritesheets();
+	void createPaths();
+
+	std::thread r;
+	void random();
+	bool keepRunning;
+	bool sinking = false;
 };

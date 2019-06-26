@@ -52,40 +52,35 @@ Graph Jogo::gridToGraph(GridGenerator gg)
 {
 	GridTile** grid = gg.getGrid();
 
-	Graph graph;
+	Graph graph(width, height);
 	for (unsigned int y = 0; y < height; y++) {
 		for (unsigned int x = 0; x < width; x++) {
-			if (grid[x][y].type != tWall)
-				graph.addNode(width * y + x);
-		}
-	}
-	std::cout << graph.getNodes().size() << " nodes" << std::endl;
-	//graph.print();
-
-	std::vector<Node> nodes = graph.getNodes();
-	for (unsigned int y = 0; y < height; y++) {
-		std::cout << y << std::endl;
-		for (unsigned int x = 0; x < width; x++) {
-			if (x > 0 && grid[x - 1][y].type != tWall) {
-				//graph.addEdge(width * y + x, width * y + (x - 1), (unsigned int)1);
-				//std::cout << "esq" << std::endl;
-			}
-			if (x < width - 1 && grid[x + 1][y].type != tWall) {
-				//graph.addEdge(width * y + x, width * y + (x + 1), (unsigned int)1);
-				//std::cout << "dir" << std::endl;
-			}
-			if (y > 0 && grid[x][y - 1].type != tWall) {
-				//graph.addEdge(width * y + x, width * (y - 1) + x, (unsigned int)1);
-				//std::cout << "top" << std::endl;
-			}
-			if (y < height - 1 && grid[x][y + 1].type != tWall) {
-				//graph.addEdge(width * y + x, width * (y + 1) + x, (unsigned int)1);
-				//std::cout << "down" << std::endl;
-			}
+			//if (grid[x][y].type != tWall)
+			graph.addNode(y * width + x);
 		}
 	}
 	
-	//graph.print();
+	for (unsigned int y = 0; y < height; y++) {
+		for (unsigned int x = 0; x < width; x++) {
+			if (x > 0 && grid[x - 1][y].type != tWall) {
+				unsigned int weight = grid[x - 1][y].dijkstraWeight;
+				graph.addEdge(width * y + x, width * y + (x - 1), weight);
+			}
+			if (x < width - 1 && grid[x + 1][y].type != tWall) {
+				unsigned int weight = grid[x + 1][y].dijkstraWeight;
+				graph.addEdge(width * y + x, width * y + (x + 1), weight);
+			}
+			if (y > 0 && grid[x][y - 1].type != tWall) {
+				unsigned int weight = grid[x][y - 1].dijkstraWeight;
+				graph.addEdge(width * y + x, width * (y - 1) + x, weight);
+			}
+			if (y < height - 1 && grid[x][y + 1].type != tWall) {
+				unsigned int weight = grid[x][y + 1].dijkstraWeight;
+				graph.addEdge(width * y + x, width * (y + 1) + x, weight);
+			}
+		}
+	}
+
 	return graph;
 }
 
@@ -136,11 +131,11 @@ PetriNet Jogo::gridToPetriNet(GridGenerator grid) {
 		pn.npcsPlacesPtr.push_back(&places[x][y]);
 	}
 
-	for (unsigned int i = 0; i < width; i++) {
+	/*for (unsigned int i = 0; i < width; i++) {
 		for (unsigned int j = 0; j < height; j++) {
 			pn.addPlace(&places[i][j]);
 		}
-	}
+	}*/
 	
 	for (unsigned int i = 0; i < width; i++) {
 		for (unsigned int j = 0; j < height; j++) {
@@ -273,6 +268,94 @@ PetriNet Jogo::gridToPetriNet(GridGenerator grid) {
 	return pn;
 }
 
+void Jogo::loadSpritesheets()
+{
+	gRecursos.carregarSpriteSheet("empty", "assets/empty.png", 0, 1);
+	gRecursos.carregarSpriteSheet("empty1", "assets/empty1.png", 0, 1);
+	gRecursos.carregarSpriteSheet("empty2", "assets/empty2.png", 0, 1);
+	gRecursos.carregarSpriteSheet("empty3", "assets/empty3.png", 0, 1);
+	gRecursos.carregarSpriteSheet("empty4", "assets/empty4.png", 0, 1);
+	gRecursos.carregarSpriteSheet("empty5", "assets/empty5.png", 0, 1);
+	gRecursos.carregarSpriteSheet("empty6", "assets/empty6.png", 0, 1);
+	gRecursos.carregarSpriteSheet("empty7", "assets/empty7.png", 0, 1);
+	gRecursos.carregarSpriteSheet("empty8", "assets/empty8.png", 0, 1);
+	gRecursos.carregarSpriteSheet("empty9", "assets/empty9.png", 0, 1);
+	gRecursos.carregarSpriteSheet("wall", "assets/wall.png", 0, 1);
+	gRecursos.carregarSpriteSheet("player", "assets/player.png", 0, 1);
+	gRecursos.carregarSpriteSheet("npc", "assets/npc.png", 0, 1);
+	gRecursos.carregarSpriteSheet("flag", "assets/flag.png", 0, 1);
+	gRecursos.carregarSpriteSheet("flooded", "assets/flooded.png", 0, 1);
+	gRecursos.carregarSpriteSheet("path", "assets/path.png", 0, 1);
+}
+
+void Jogo::createPaths()
+{
+	Graph graph = gridToGraph(grid);
+	std::vector<Player> players = grid.getPlayers();
+	for (std::vector<Player>::iterator p = players.begin(); p != players.end(); p++) {
+		unsigned int pPos = p->getY() * width + p->getX();
+		std::vector<Flag> flags = grid.getFlags();
+		for (std::vector<Flag>::iterator f = flags.begin(); f != flags.end(); f++) {
+			unsigned int fPos = f->getY() * width + f->getX();
+			std::vector<unsigned int> path = graph.dijkstra(pPos, fPos);
+			std::vector<Pos2> pathPos;
+			for (std::vector<unsigned int>::iterator it = path.begin(); it != path.end(); it++)
+				pathPos.push_back(graph.getNodePosById(*it));
+			grid.drawPath(pathPos);
+		}
+	}
+}
+
+void Jogo::random() {
+	Randomizer r;
+	using namespace std::chrono;
+	while (true) {
+		uint64_t prev = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+		double t = r.uniform(2, 5);
+		//double t = r.exponential(1);
+		//double t = r.normal(2, 1); while (t == 0) { t = r.normal(2, 1); }
+		t = ceil(abs(t));
+		uint64_t curr = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+		while (keepRunning && curr < prev + t * 1000) {
+			curr = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+		}
+		
+		if (keepRunning) {
+			if (!sinking) {
+				int x = rand() % width;
+				int y = rand() % height;
+				bool sank = grid.sink(sinking, Movement(x, y));
+				while (!sank) {
+					x = rand() % width;
+					y = rand() % height;
+					sank = grid.sink(sinking, Movement(x, y));
+				}
+				sinking = true;
+			}
+			else {
+				int tries = 0;
+				int x = -1 + rand() % 3;
+				int y = -1 + rand() % 3;
+				bool sank = grid.sink(sinking, Movement(x, y));
+				while (!sank) {
+					tries++;
+					std::cout << "looping " << tries << std::endl;
+					x = -1 + rand() % 3;
+					y = -1 + rand() % 3;
+					sank = grid.sink(sinking, Movement(x, y));
+					if (tries >= 16) {
+						sinking = false;
+						break;
+					}
+				}
+			}
+		}
+		else {
+			break;
+		}
+	}
+}
+
 Jogo::Jogo()
 {
 }
@@ -281,86 +364,13 @@ Jogo::~Jogo()
 {
 }
 
-void testDijkstra() {
-	Graph graph;
-
-	/*for (size_t i = 0; i < 7500; i++)
-	{
-		graph.addNode(i);
-	}
-
-	srand((unsigned int)time(NULL));
-	for (size_t i = 0; i < 100 * 75 * 4 - 2 * 100 - 2 * 75; i++)
-	{
-		graph.addEdge(rand() % 7500, rand() % 7500, 1);
-	}*/
-
-	graph.addNode(0);
-	graph.addNode(1);
-	graph.addNode(2);
-	graph.addNode(3);
-	graph.addNode(4);
-	graph.addNode(5);
-	graph.addNode(6);
-	graph.addNode(7);
-	graph.addNode(8);
-
-	graph.addEdge(0, 1, 4);
-	graph.addEdge(0, 7, 8);
-	
-	graph.addEdge(1, 0, 4);
-	graph.addEdge(1, 2, 8);
-	graph.addEdge(1, 7, 11);
-	
-	graph.addEdge(2, 1, 8);
-	graph.addEdge(2, 3, 7);
-	graph.addEdge(2, 5, 4);
-	graph.addEdge(2, 8, 2);
-	
-	graph.addEdge(3, 2, 7);
-	graph.addEdge(3, 4, 9);
-	graph.addEdge(3, 5, 14);
-
-	graph.addEdge(4, 3, 9);
-	graph.addEdge(4, 5, 10);
-	
-	graph.addEdge(5, 2, 4);
-	graph.addEdge(5, 3, 14);
-	graph.addEdge(5, 4, 10);
-	graph.addEdge(5, 6, 2);
-	
-	graph.addEdge(6, 5, 2);
-	graph.addEdge(6, 7, 1);
-	graph.addEdge(6, 8, 6);
-	
-	graph.addEdge(7, 0, 8);
-	graph.addEdge(7, 1, 11);
-	graph.addEdge(7, 6, 1);
-	graph.addEdge(7, 8, 7);
-	
-	graph.addEdge(8, 2, 2);
-	graph.addEdge(8, 6, 6);
-	graph.addEdge(8, 7, 7);
-	
-	graph.print();
-
-	std::vector<unsigned int> path = graph.dijkstra(0, 4);
-	for (std::vector<unsigned int>::iterator it = path.begin(); it != path.end(); it++)
-		std::cout << *it << std::endl;
-}
-
 void Jogo::inicializar()
 {
 	unsigned int screenWidth = 800;
 	unsigned int screenHeight = 600;
 	uniInicializar(screenWidth, screenHeight, false);
 
-	gRecursos.carregarSpriteSheet("empty", "assets/empty.png", 0, 1);
-	gRecursos.carregarSpriteSheet("wall", "assets/wall.png", 0, 1);
-	gRecursos.carregarSpriteSheet("player", "assets/player.png", 0, 1);
-	gRecursos.carregarSpriteSheet("npc", "assets/npc.png", 0, 1);
-	gRecursos.carregarSpriteSheet("flag", "assets/flag.png", 0, 1);
-	gRecursos.carregarSpriteSheet("flooded", "assets/flooded.png", 0, 1);
+	loadSpritesheets();
 
 	unsigned int w = screenWidth / gRecursos.getSpriteSheet("empty")->getTextura()->getLargura();
 	unsigned int h = screenHeight / gRecursos.getSpriteSheet("empty")->getTextura()->getAltura();
@@ -375,17 +385,13 @@ void Jogo::inicializar()
 	grid.addNpcs(playersQuadrant, 3);
 	grid.fill();
 	grid.evaporate();
+
+	//createPaths();
 	grid.setSpritesheets();
-
-	//testDijkstra();
-
-		//Graph graph = gridToGraph(grid);
-	//graph.print();
-	//std::vector<unsigned int> path = graph.dijkstra(0, 1);
 	
 	//pn = gridToPetriNet(grid);
 
-	pn.generate(grid, width, height);
+	pn.generate(grid, width, height, fin, fout, fte, ftf);
 }
 
 void Jogo::finalizar()
@@ -395,17 +401,57 @@ void Jogo::finalizar()
 
 void Jogo::executar()
 {
-	while(!gTeclado.soltou[TECLA_ESC] && !gEventos.sair)
+	keepRunning = true;
+	r = std::thread(&Jogo::random, this);
+	while (!gTeclado.soltou[TECLA_ESC])
 	{
 		uniIniciarFrame();
 
-		std::cout << pn.playersPlacesPtr.size() << std::endl;
-		std::vector<Movement> playersMovements = grid.update();
+		if (gTeclado.soltou[TECLA_ESPACO]) {
+			grid.toggleWeightsVisible();
+			grid.setSpritesheets();
+		}
+
+		Movements movements = grid.update();
 		std::vector<Player> players = grid.getPlayers();
-		pn.runCycle(playersMovements, players);
+		std::vector<Npc> npcs = grid.getNpcs();
+		pn.runCycle(movements, players, npcs);
 		grid.draw();
-		gEventos.sair = (grid.getFlags().size() == 0);
-		
+		if (grid.getFlags().size() == 0 || !movements.allAlive)
+			avancar();
+
+		//std::cout << gTempo.getFPS() << std::endl;
 		uniTerminarFrame();
 	}
+	keepRunning = false;
+	r.join();
+}
+
+void Jogo::avancar()
+{
+	unsigned int screenWidth = 800;
+	unsigned int screenHeight = 600;
+
+	unsigned int w = screenWidth / gRecursos.getSpriteSheet("empty")->getTextura()->getLargura();
+	unsigned int h = screenHeight / gRecursos.getSpriteSheet("empty")->getTextura()->getAltura();
+
+	TerrainGenerator tg(w, h);
+	bool** terrain = tg.generate();
+
+	grid.destroy(w, h);
+	grid.generate(terrain, w, h);
+	unsigned int playersQuadrant = grid.addPlayers();
+	grid.flood(tEmpty, tFlooded);
+	grid.addFlags(playersQuadrant, 3);
+	grid.addNpcs(playersQuadrant, 3);
+	grid.fill();
+	grid.evaporate();
+
+	//createPaths();
+	grid.setSpritesheets();
+
+	//pn = gridToPetriNet(grid);
+
+	pn.destroy();
+	pn.generate(grid, width, height, fin, fout, fte, ftf);
 }

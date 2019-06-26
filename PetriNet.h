@@ -19,7 +19,7 @@ public:
 	bool addTransition(Transition* transition);
 	Transition* delTransition(Transition* transition);
 	std::vector<Transition*> getTransitions();
-	void runCycle(std::vector<Movement> playersMovements, std::vector<Player> players);
+	void runCycle(Movements movements, std::vector<Player> players, std::vector<Npc> npcs);
 	void showStatus();
 	bool saveNet();
 	bool loadNet();
@@ -40,7 +40,8 @@ public:
 	std::vector<Transition*> npcsInTransitionsPtr;
 	std::vector<Transition*> npcsOutTransitionsPtr;
 
-	void generate(GridGenerator grid, unsigned int width, unsigned int height);
+	void generate(GridGenerator grid, unsigned int width, unsigned int height, void(*tepc)(PetriToken, Place) = nullptr, void(*tlpc)(PetriToken, Place) = nullptr, void(*tec)(Transition) = nullptr, void(*tfc)(Transition) = nullptr);
+	void destroy();
 	std::vector<Place*> places2;
 	std::vector<Transition*> transitions2;
 private:
